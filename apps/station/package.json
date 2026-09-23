@@ -1,0 +1,22 @@
+{
+  "name": "@eternity/station",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Eternity Station game client: canvas-rendered space station where you watch the crew work and approve what leaves the Airlock.",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview --port 5173",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@eternity/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.0.0",
+    "vitest": "^4.0.0"
+  }
+}
