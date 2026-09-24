@@ -11,12 +11,13 @@ Read `01-economics-reality-check.md` first. Every plan below assumes you accept 
 - One niche per venture. The market model penalises many listings in one niche (`saturationK`); HERMES spawns a new venture for a new niche rather than piling listings into an old one.
 - Quality gate before publish. `review-output` produces a 0 to 1 score; demand scales with the square of it. A 0.5 listing gets a quarter of the traffic of a 1.0 listing. Publishing junk faster never wins.
 
-Default kill rules (`DEFAULT_POLICY`), applied by HERMES after a 72-tick grace period (three simulated days):
+Default kill rules (`DEFAULT_POLICY`), applied by HERMES after a 336-tick grace period (two simulated weeks), and only once the venture has published at least one listing:
 
 | Rule | Threshold |
 |---|---|
 | Trailing ROI over the last 168 ticks | below -0.5 (spent twice what it earned back) |
-| Ticks since last sale | more than 240 (ten simulated days), or never sold in 240 ticks |
+| Ticks since last sale | more than 504 (three simulated weeks), or never sold in 504 ticks |
+| Nothing published | after 672 ticks (two grace periods) the pipeline is treated as stalled and the venture is killed |
 
 In live mode a simulated day is whatever `TICK_HZ` makes it. The kind-specific kill criteria below are stated in real calendar time and are for you, at the weekly review.
 
@@ -218,7 +219,7 @@ Target at day 30: ten indexed articles, first impressions in Search Console, $0.
 
 ### Kill criteria
 
-HERMES will want to kill this at 240 ticks with no sale. Give it 90 real days from first publish. You, at day 90: fewer than 500 organic impressions a month in Search Console across ten or more posts, or zero clicks on affiliate links with 1,000 or more visits. If Google drops the site by more than half in a week, pause, do not publish more, and audit.
+HERMES will want to kill this at 504 ticks with no sale. Give it 90 real days from first publish. You, at day 90: fewer than 500 organic impressions a month in Search Console across ten or more posts, or zero clicks on affiliate links with 1,000 or more visits. If Google drops the site by more than half in a week, pause, do not publish more, and audit.
 
 ---
 

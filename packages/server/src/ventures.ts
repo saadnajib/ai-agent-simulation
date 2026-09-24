@@ -158,6 +158,7 @@ export function setVentureStatus(world: World, venture: Venture, status: Venture
   venture.status = status;
   venture.statusReason = reason;
   if (status === 'killed') {
+    venture.killedAtTick = world.tick;
     for (const task of openTasks(world, venture.id)) cancel(task, `venture killed: ${reason}`);
     for (const agent of crewOf(world, venture)) {
       delete agent.ventureId;

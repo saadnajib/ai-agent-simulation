@@ -20,11 +20,12 @@ describe('DEFAULT_POLICY', () => {
       epochTicks: 24,
       windowTicks: 168,
       explorationFloor: 0.05,
-      graceTicks: 72,
+      graceTicks: 336,
       killRoiThreshold: -0.5,
-      killNoSaleTicks: 240,
+      killNoSaleTicks: 504,
       scaleRoiThreshold: 0.5,
       maxVentures: 8,
+      maxVenturesPerKind: 3,
       maxCrewPerVenture: 3,
     });
   });
@@ -88,8 +89,8 @@ describe('planEpoch', () => {
 
   it('kills a venture that has gone too long without a sale, including one that never sold', () => {
     const ventures = [
-      makeVenture({ id: 'stale', metrics: { trailingRoi: 0, ticksSinceLastSale: 300 } }),
-      makeVenture({ id: 'never', createdAtTick: TICK - 500, metrics: { trailingRoi: 0, ticksSinceLastSale: null } }),
+      makeVenture({ id: 'stale', metrics: { trailingRoi: 0, ticksSinceLastSale: 600 } }),
+      makeVenture({ id: 'never', createdAtTick: TICK - 700, metrics: { trailingRoi: 0, ticksSinceLastSale: null } }),
       makeVenture({ id: 'fresh', metrics: { trailingRoi: 0, ticksSinceLastSale: 100 } }),
     ];
     const statuses = statusActions(planEpoch(makeState(ventures, TICK), createRng('stale')));
@@ -147,6 +148,45 @@ describe('planEpoch', () => {
     const actions = planEpoch(makeState(full, TICK), createRng('slot'));
     expect(statusActions(actions).filter((a) => a.status === 'killed')).toHaveLength(1);
     expect(actions.filter((a) => a.type === 'spawn-venture')).toHaveLength(1);
+  });
+
+  it('does not judge ROI before anything is published, but kills a pipeline stalled for two grace periods', () => {
+    const ventures = [
+      makeVenture({ id: 'unpublished', createdAtTick: TICK - 400, metrics: { trailingRoi: -1, unitsPublished: 0, ticksSinceLastSale: null } }),
+      makeVenture({ id: 'stalled', createdAtTick: TICK - 800, metrics: { trailingRoi: -1, unitsPublished: 0, ticksSinceLastSale: null } }),
+    ];
+    const statuses = statusActions(planEpoch(makeState(ventures, TICK), createRng('unpub')));
+    expect(statuses.find((a) => a.ventureId === 'unpublished')).toBeUndefined();
+    expect(statuses.find((a) => a.ventureId === 'stalled')?.status).toBe('killed');
+    expect(statuses.find((a) => a.ventureId === 'stalled')?.reason).toMatch(/Nothing published/);
+  });
+
+  it('skips kinds at the per-kind cap and returns null when every kind is capped', () => {
+    const music = Array.from({ length: DEFAULT_POLICY.maxVenturesPerKind }, (_, i) =>
+      makeVenture({ id: `m${i}`, kind: 'music-packs', metrics: { trailingRoi: 3 } }),
+    );
+    const other = makeVenture({ id: 'p', kind: 'pod-store', metrics: { trailingRoi: -0.2 } });
+    expect(chooseSpawnKind([...music, other], createRng('cap'))).not.toBe('music-packs');
+    const everything = VENTURE_KINDS.flatMap((kind) =>
+      Array.from({ length: DEFAULT_POLICY.maxVenturesPerKind }, (_, i) => makeVenture({ id: `${kind}${i}`, kind })),
+    );
+    expect(chooseSpawnKind(everything, createRng('cap'))).toBeNull();
+  });
+
+  it('never reuses the name or thesis of a killed venture', () => {
+    const rng = createRng('names');
+    const seen = new Set<string>();
+    const theses = new Set<string>();
+    const ventures = [makeVenture({ id: 'a', kind: 'pod-store' })];
+    for (let i = 0; i < 12; i++) {
+      const spawn = planEpoch(makeState(ventures, TICK), rng).find((a) => a.type === 'spawn-venture');
+      if (!spawn || spawn.type !== 'spawn-venture') throw new Error('expected a spawn');
+      expect(seen.has(spawn.name)).toBe(false);
+      expect(theses.has(spawn.thesis)).toBe(false);
+      seen.add(spawn.name);
+      theses.add(spawn.thesis);
+      ventures.push(makeVenture({ id: `dead${i}`, kind: spawn.kind, name: spawn.name, thesis: spawn.thesis, status: 'killed' }));
+    }
   });
 
   it('spawns in the best-performing kind, breaking ties toward the least represented kind', () => {

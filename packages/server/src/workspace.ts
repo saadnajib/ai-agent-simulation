@@ -60,7 +60,11 @@ export function resolveConfined(root: string, rel: string): string {
     if (parent === probe) break;
     probe = parent;
   }
-  const realRoot = existsSync(absRoot) ? realpathSync(absRoot) : absRoot;
+  // If nothing under the root exists yet there is no link inside it to follow;
+  // the root's own ancestors are ours, not the model's.
+  const probeFromRoot = relative(absRoot, probe);
+  if (probeFromRoot.startsWith('..') || isAbsolute(probeFromRoot)) return target;
+  const realRoot = realpathSync(absRoot);
   const realProbe = realpathSync(probe);
   const relReal = relative(realRoot, realProbe);
   if (relReal.startsWith('..') || isAbsolute(relReal)) {

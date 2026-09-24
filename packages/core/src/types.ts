@@ -147,6 +147,8 @@ export interface Venture {
   metrics: VentureMetrics;
   /** Why the venture is in its current status, written by the Overseer. */
   statusReason?: string;
+  /** Set when status becomes 'killed'. Old corpses with no live listings leave the snapshot. */
+  killedAtTick?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +445,8 @@ export interface AllocationPolicy {
   scaleRoiThreshold: number;
   /** Max concurrent ventures. */
   maxVentures: number;
+  /** Max live ventures of one kind, so one lucky kind cannot become a monoculture. */
+  maxVenturesPerKind: number;
   /** Max crew per venture. */
   maxCrewPerVenture: number;
 }
@@ -481,6 +485,8 @@ export interface Clock {
 
 export interface StationState {
   mode: RunMode;
+  /** Sim mode only: how far simulated demand is scaled above the honest baseline so the game stays lively. */
+  simDemandMultiplier?: number;
   clock: Clock;
   treasury: Treasury;
   policy: AllocationPolicy;

@@ -3,7 +3,7 @@
  * reads process.env: index.ts calls loadConfig once and passes the result down.
  */
 import { z } from 'zod';
-import type { RunMode } from '@eternity/core';
+import type { RunMode, AllocationPolicy } from '@eternity/core';
 
 const bool = (fallback: boolean) =>
   z.preprocess((value) => {
@@ -14,6 +14,23 @@ const bool = (fallback: boolean) =>
     if (['0', 'false', 'no', 'off'].includes(text)) return false;
     return value;
   }, z.boolean());
+
+const positiveInt = z.number().int().positive();
+const PolicyOverridesSchema = z
+  .object({
+    epochTicks: positiveInt,
+    windowTicks: positiveInt,
+    explorationFloor: z.number().min(0).max(0.5),
+    graceTicks: z.number().int().nonnegative(),
+    killRoiThreshold: z.number(),
+    killNoSaleTicks: positiveInt,
+    scaleRoiThreshold: z.number(),
+    maxVentures: positiveInt,
+    maxVenturesPerKind: positiveInt,
+    maxCrewPerVenture: positiveInt,
+  })
+  .partial()
+  .strict();
 
 const optionalNumber = z.preprocess((value) => (value === '' ? undefined : value), z.coerce.number().optional());
 
@@ -35,6 +52,16 @@ export const EnvSchema = z.object({
   SIM_DEMAND_MULTIPLIER: z.coerce.number().positive().default(25),
   BRAIN_CONCURRENCY: optionalNumber.pipe(z.number().int().positive().optional()),
   MAX_CREW: z.coerce.number().int().positive().default(40),
+  /** JSON object merged over DEFAULT_POLICY, e.g. {"graceTicks":720}. */
+  POLICY_OVERRIDES: z.preprocess((value) => {
+    if (value === undefined || value === '') return {};
+    if (typeof value !== 'string') return value;
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return value;
+    }
+  }, PolicyOverridesSchema).default({}),
   NODE_ENV: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   STATIC_DIR: z.string().optional(),
@@ -42,6 +69,8 @@ export const EnvSchema = z.object({
 
 export interface ServerConfig {
   mode: RunMode;
+  /** Fields that override DEFAULT_POLICY (and any policy stored in the database). */
+  policyOverrides: Partial<AllocationPolicy>;
   port: number;
   host: string;
   dbPath: string;
@@ -102,6 +131,7 @@ export function loadConfig(env: Record<string, string | undefined>, overrides: C
     // Scripted brains cost nothing to run concurrently; Claude calls are bounded.
     brainConcurrency: e.BRAIN_CONCURRENCY ?? (mode === 'sim' ? 32 : 4),
     maxCrew: e.MAX_CREW,
+    policyOverrides: e.POLICY_OVERRIDES,
     production: e.NODE_ENV === 'production',
   };
   if (e.ANTHROPIC_API_KEY) config.apiKey = e.ANTHROPIC_API_KEY;

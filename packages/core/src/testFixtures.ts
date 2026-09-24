@@ -23,7 +23,7 @@ export function emptyMetrics(overrides: Partial<VentureMetrics> = {}): VentureMe
     profitCents: 0,
     roi: 0,
     unitsProduced: 0,
-    unitsPublished: 0,
+    unitsPublished: 3,
     unitsSold: 0,
     impressions: 0,
     clicks: 0,

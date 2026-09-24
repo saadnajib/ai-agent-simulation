@@ -113,13 +113,13 @@ export function computeVentureMetrics(venture: Venture, entries: readonly Ledger
 export function formatCents(cents: number): string; // "$1,234.56", "-$0.42", "$1.2M" for large
 
 // allocation.ts — the deterministic half of HERMES
-export const DEFAULT_POLICY: AllocationPolicy; // epochTicks 24, windowTicks 168, explorationFloor 0.05, graceTicks 72, killRoiThreshold -0.5, killNoSaleTicks 240, scaleRoiThreshold 0.5, maxVentures 8, maxCrewPerVenture 3
+export const DEFAULT_POLICY: AllocationPolicy; // epochTicks 24, windowTicks 168, explorationFloor 0.05, graceTicks 336, killRoiThreshold -0.5, killNoSaleTicks 504, scaleRoiThreshold 0.5, maxVentures 8, maxVenturesPerKind 3, maxCrewPerVenture 3
 export function planEpoch(state: StationState, rng: Rng): OverseerAction[];
 // 1. For each non-killed, non-paused venture compute a score from trailingRoi (softmax with temperature; ventures in grace get the mean score).
 // 2. Shares = explorationFloor + (1 - n*floor) * softmax. Emit set-budget-share.
-// 3. Kill rule (after grace): trailingRoi < killRoiThreshold OR ticksSinceLastSale > killNoSaleTicks → set-status killed with reason.
+// 3. Kill rule (after grace): only once the venture has published something: trailingRoi < killRoiThreshold OR ticksSinceLastSale > killNoSaleTicks → set-status killed with reason. A venture with nothing published after 2*graceTicks is killed as stalled.
 // 4. Scale rule: trailingRoi >= scaleRoiThreshold → set-status scaling. Demote scaling→active if it drops below.
-// 5. If active ventures < maxVentures, spawn-venture in the kind with the best mean trailingRoi (ties → least-represented kind) with a thesis from playbooks.suggestThesis(kind, rng).
+// 5. If active ventures < maxVentures, spawn-venture in the kind with the best mean trailingRoi among kinds below maxVenturesPerKind (ties → least-represented kind), with a thesis and name not used by any venture, killed ones included.
 // 6. Emit one broadcast summarising the epoch in one sentence.
 
 // playbooks.ts — what each venture kind actually does

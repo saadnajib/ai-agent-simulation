@@ -97,7 +97,9 @@ export function createBottomBar(root: HTMLElement, store: StationStore, transpor
         const { day, time, date } = formatSimClock(c.tick, c.simTime);
         setText(clockMain, `${day} ${time}`);
         setText(clockSub, `tick ${c.tick} · ${date}${c.paused ? ' · paused' : ''}`);
-        mode.textContent = station.mode.toUpperCase();
+        const demand = station.mode === 'sim' && station.simDemandMultiplier && station.simDemandMultiplier !== 1 ? ` x${station.simDemandMultiplier} DEMAND` : '';
+        mode.textContent = station.mode.toUpperCase() + demand;
+        mode.title = demand ? `Simulated demand is scaled ${station.simDemandMultiplier}x above the honest baseline (SIM_DEMAND_MULTIPLIER). Do not read these numbers as a forecast.` : '';
         mode.className = `mode-badge ${station.mode}`;
       } else {
         setText(clockMain, 'awaiting snapshot');

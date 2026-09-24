@@ -2,7 +2,7 @@
 
 A space station rendered as a 2D game, crewed by AI agents running real micro-businesses, ruled by an Overseer whose only power is to move the budget.
 
-![Eternity Station mock](docs/screenshots/station-mock.png)
+![Eternity Station running in sim mode](docs/screenshots/station-live-sim.png)
 
 ## The 60-second pitch
 

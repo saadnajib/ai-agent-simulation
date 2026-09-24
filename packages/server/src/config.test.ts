@@ -64,3 +64,13 @@ describe('parseCliArgs', () => {
     expect(() => parseCliArgs(['--bogus'])).toThrow(ConfigError);
   });
 });
+
+describe('POLICY_OVERRIDES', () => {
+  it('merges a JSON object over the default policy and rejects unknown keys', () => {
+    const config = loadConfig({ POLICY_OVERRIDES: '{"graceTicks":720,"killNoSaleTicks":1440}' });
+    expect(config.policyOverrides).toEqual({ graceTicks: 720, killNoSaleTicks: 1440 });
+    expect(loadConfig({}).policyOverrides).toEqual({});
+    expect(() => loadConfig({ POLICY_OVERRIDES: '{"bogus":1}' })).toThrow(ConfigError);
+    expect(() => loadConfig({ POLICY_OVERRIDES: 'not json' })).toThrow(ConfigError);
+  });
+});

@@ -27,6 +27,8 @@ import { Ledger, type LedgerRecordInput } from './ledger.js';
 
 export const SNAPSHOT_LEDGER_ENTRIES = 200;
 export const SNAPSHOT_DIRECTIVES = 20;
+/** Killed ventures without live listings leave the snapshot after this many ticks (they stay in SQLite). */
+const KILLED_VISIBLE_TICKS = 336;
 /** Finished tasks and decided approvals older than this leave memory and snapshots (they stay in SQLite). */
 export const HISTORY_TICKS = 24 * 30;
 /** Snapshots carry finished tasks from the last week only. */
@@ -55,7 +57,7 @@ export class World {
   readonly clock: StationClock;
   readonly ledger: Ledger;
   readonly now: () => string;
-  policy: AllocationPolicy = { ...DEFAULT_POLICY };
+  policy: AllocationPolicy;
   targetCents: number;
   seed: number;
 
@@ -90,6 +92,7 @@ export class World {
     this.map = buildStationMap();
     this.seed = opts.config.seed;
     this.targetCents = opts.config.targetCents;
+    this.policy = { ...DEFAULT_POLICY, ...opts.config.policyOverrides };
     this.rootRng = createRng(this.seed);
     this.idRng = this.rootRng.fork('ids:0');
     this.clock = new StationClock({ tickHz: opts.config.tickHz });
@@ -231,14 +234,25 @@ export class World {
     return removed;
   }
 
+  /** Killed ventures stay visible for two sim weeks, or for as long as they still have listings live. */
+  private inSnapshot(venture: Venture): boolean {
+    if (venture.status !== 'killed') return true;
+    if (this.tick - (venture.killedAtTick ?? this.tick) < KILLED_VISIBLE_TICKS) return true;
+    for (const listing of this.listings.values()) {
+      if (listing.ventureId === venture.id && listing.status === 'live') return true;
+    }
+    return false;
+  }
+
   state(): StationState {
     const recent = this.tick - SNAPSHOT_TASK_TICKS;
     return {
       mode: this.mode,
+      ...(this.mode === 'sim' ? { simDemandMultiplier: this.config.simDemandMultiplier } : {}),
       clock: this.clock.snapshot(),
       treasury: this.treasury(),
       policy: { ...this.policy },
-      ventures: [...this.ventures.values()],
+      ventures: [...this.ventures.values()].filter((v) => this.inSnapshot(v)),
       agents: [...this.agents.values()],
       tasks: [...this.tasks.values()].filter((t) => !TERMINAL_TASK.has(t.status) || (t.finishedAtTick ?? t.createdAtTick) >= recent),
       listings: [...this.listings.values()],
@@ -279,7 +293,8 @@ export class World {
     const target = this.db.getMeta<number>('targetCents');
     if (typeof target === 'number' && target > 0) this.targetCents = target;
     const policy = this.db.getMeta<AllocationPolicy>('policy');
-    if (policy) this.policy = { ...DEFAULT_POLICY, ...policy };
+    // Env overrides win over the stored row so a redeploy can retune a running station.
+    if (policy) this.policy = { ...DEFAULT_POLICY, ...policy, ...this.config.policyOverrides };
     const instructions = this.db.getMeta<string[]>('instructions');
     if (Array.isArray(instructions)) this.instructions = instructions.filter((s) => typeof s === 'string');
     const milestones = this.db.getMeta<string[]>('announcedMilestones');

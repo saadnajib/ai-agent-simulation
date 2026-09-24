@@ -23,11 +23,14 @@ export const DEFAULT_POLICY: AllocationPolicy = {
   epochTicks: 24,
   windowTicks: 168,
   explorationFloor: 0.05,
-  graceTicks: 72,
+  // Two simulated weeks: the fastest honest signal a new store can give.
+  graceTicks: 336,
   killRoiThreshold: -0.5,
-  killNoSaleTicks: 240,
+  // Three weeks without a sale after the grace period is a dead niche, not bad luck.
+  killNoSaleTicks: 504,
   scaleRoiThreshold: 0.5,
   maxVentures: 8,
+  maxVenturesPerKind: 3,
   maxCrewPerVenture: 3,
 };
 
@@ -85,6 +88,15 @@ interface KillDecision {
 function killDecision(venture: Venture, tick: number, policy: AllocationPolicy): KillDecision | null {
   if (inGrace(venture, tick, policy)) return null;
   const m = venture.metrics;
+  const age = ageOf(venture, tick);
+  // A venture that has never put anything on sale cannot be judged on ROI yet,
+  // but one that still has nothing live after two grace periods is stalled.
+  if (m.unitsPublished === 0) {
+    if (age >= policy.graceTicks * 2) {
+      return { venture, reason: `Nothing published after ${age} ticks (spent ${formatCents(m.costCents)}); the pipeline is stalled.` };
+    }
+    return null;
+  }
   if (m.trailingRoi < policy.killRoiThreshold) {
     return {
       venture,
@@ -129,8 +141,12 @@ function statusActions(venture: Venture, policy: AllocationPolicy): OverseerActi
   return [];
 }
 
-/** Kind with the best mean trailing ROI among live ventures; ties go to the least represented kind. */
-export function chooseSpawnKind(alive: readonly Venture[], rng: Rng): VentureKind {
+/**
+ * Kind with the best mean trailing ROI among live ventures; ties go to the
+ * least represented kind. Kinds already at `maxVenturesPerKind` are skipped.
+ * Returns null when every kind is at its cap.
+ */
+export function chooseSpawnKind(alive: readonly Venture[], rng: Rng, policy: AllocationPolicy = DEFAULT_POLICY): VentureKind | null {
   const byKind = new Map<VentureKind, number[]>();
   for (const kind of VENTURE_KINDS) byKind.set(kind, []);
   for (const v of alive) byKind.get(v.kind)?.push(clampRoi(v.metrics.trailingRoi));
@@ -140,6 +156,7 @@ export function chooseSpawnKind(alive: readonly Venture[], rng: Rng): VentureKin
   let bestCount = Number.POSITIVE_INFINITY;
   for (const kind of VENTURE_KINDS) {
     const rois = byKind.get(kind) ?? [];
+    if (rois.length >= policy.maxVenturesPerKind) continue;
     const score = mean(rois);
     const count = rois.length;
     if (score > bestScore + 1e-9) {
@@ -155,18 +172,21 @@ export function chooseSpawnKind(alive: readonly Venture[], rng: Rng): VentureKin
       }
     }
   }
+  if (best.length === 0) return null;
   return best.length === 1 ? (best[0] as VentureKind) : rng.pick(best);
 }
 
-function spawnAction(alive: readonly Venture[], rng: Rng): OverseerAction {
-  const kind = chooseSpawnKind(alive, rng);
+function spawnAction(alive: readonly Venture[], all: readonly Venture[], rng: Rng, policy: AllocationPolicy): OverseerAction | null {
+  const kind = chooseSpawnKind(alive, rng, policy);
+  if (kind === null) return null;
   const playbook = PLAYBOOKS[kind];
-  const takenTheses = new Set(alive.map((v) => v.thesis.toLowerCase()));
+  // Do not re-run a thesis that is live or that already failed.
+  const takenTheses = new Set(all.map((v) => v.thesis.toLowerCase()));
   let thesis = playbook.suggestThesis(rng);
-  for (let attempt = 0; attempt < 8 && takenTheses.has(thesis.toLowerCase()); attempt++) {
+  for (let attempt = 0; attempt < 16 && takenTheses.has(thesis.toLowerCase()); attempt++) {
     thesis = playbook.suggestThesis(rng);
   }
-  const name = ventureNameFor(kind, rng, alive.map((v) => v.name));
+  const name = ventureNameFor(kind, rng, all.map((v) => v.name));
   return { type: 'spawn-venture', kind, thesis, name };
 }
 
@@ -231,8 +251,8 @@ export function planEpoch(state: StationState, rng: Rng): OverseerAction[] {
   const survivors = alive.filter((v) => !killedIds.has(v.id));
   let spawned: OverseerAction | null = null;
   if (survivors.length < policy.maxVentures) {
-    spawned = spawnAction(survivors, rng);
-    actions.push(spawned);
+    spawned = spawnAction(survivors, state.ventures, rng, policy);
+    if (spawned !== null) actions.push(spawned);
   }
 
   // Step 6.

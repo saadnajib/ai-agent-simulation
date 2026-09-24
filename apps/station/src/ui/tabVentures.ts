@@ -26,7 +26,7 @@ function ventureButtons(v: Venture): string {
   if (v.status === 'paused') buttons.push('<button data-status="active" type="button" class="ok">Resume</button>');
   else if (v.status !== 'killed') buttons.push('<button data-status="paused" type="button">Pause</button>');
   if (v.status !== 'killed') buttons.push('<button data-status="killed" type="button" class="danger">Kill</button>');
-  else buttons.push('<button data-status="incubating" type="button">Revive</button>');
+  if (buttons.length === 0) return '<div class="btn-row dim-text">Killed. Live listings keep selling; nothing new is funded.</div>';
   return `<div class="btn-row">${buttons.join('')}</div>`;
 }
 

@@ -122,6 +122,9 @@ export class OverseerEngine {
     alive += deterministic.filter((a) => a.type === 'spawn-venture').length;
     alive -= deterministic.filter((a) => a.type === 'set-status' && a.status === 'killed').length;
     let crew = state.agents.filter((a) => a.status !== 'offline').length;
+    const perKind = new Map<string, number>();
+    for (const v of state.ventures) if (v.status !== 'killed') perKind.set(v.kind, (perKind.get(v.kind) ?? 0) + 1);
+    for (const a of deterministic) if (a.type === 'spawn-venture') perKind.set(a.kind, (perKind.get(a.kind) ?? 0) + 1);
 
     for (const action of proposal.actions) {
       switch (action.type) {
@@ -142,8 +145,10 @@ export class OverseerEngine {
         }
         case 'spawn-venture': {
           if (alive >= policy.maxVentures) break;
+          if ((perKind.get(action.kind) ?? 0) >= policy.maxVenturesPerKind) break;
           merged.push(action);
           alive += 1;
+          perKind.set(action.kind, (perKind.get(action.kind) ?? 0) + 1);
           break;
         }
         case 'hire': {

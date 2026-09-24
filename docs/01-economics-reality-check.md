@@ -129,7 +129,7 @@ The real break-even is against the realistic cost row in 3.3, so multiply the sa
 
 Two ways to make break-even easier, both built into the allocator (`packages/core/src/allocation.ts`):
 
-1. Kill fast. A venture past `graceTicks` (72 ticks, three sim days) with trailing ROI below -0.5, or no sale in 240 ticks, is killed and its share goes to the survivors. Killed budget is the cheapest budget you have.
+1. Kill fast. A venture past `graceTicks` (336 ticks, two sim weeks) that has published something and shows trailing ROI below -0.5, or no sale in 504 ticks, is killed and its share goes to the survivors. A venture that has published nothing after two grace periods is killed as stalled. Killed budget is the cheapest budget you have.
 2. Concentrate. A venture at trailing ROI 0.5 or better is promoted to `scaling` and gets the largest softmax share. Winners are rare; when one shows up, feed it.
 
 ## 5. The trillion-dollar mirror

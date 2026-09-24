@@ -329,7 +329,7 @@ const writeListing: Generator = (task, ctx) => {
     ventureId: ctx.venture.id,
     storefrontId: storefront?.id ?? '',
     platform,
-    title: `${productTitle} | ${titleCase(niche)}`.slice(0, 140),
+    title: (productTitle.toLowerCase().includes(niche.toLowerCase()) ? productTitle : `${productTitle} | ${titleCase(niche)}`).slice(0, 140),
     description,
     tags: keywords.slice(0, 13),
     priceCents: suggested,

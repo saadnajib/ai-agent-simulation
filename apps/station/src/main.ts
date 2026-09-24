@@ -219,6 +219,8 @@ function boot(): void {
     order.sort((a, b) => a.position.y - b.position.y);
     const input = scratch.input;
     input.nowMs = nowMs;
+    // At fast-forward speeds only working crew talk; idle chatter in quarters piles up over the core.
+    const fastForward = station.clock.speed >= 16;
     const pass = (draw: (c: CanvasRenderingContext2D, cam: Camera, i: AgentDrawInput, r: SpriteRect) => void): void => {
       for (const agent of order) {
         resolveAgentPosition(agent, store.state.motions.get(agent.id), nowMs, scratch.pos);
@@ -228,7 +230,8 @@ function boot(): void {
         input.moving = scratch.pos.moving;
         input.selected = ui.selectedAgentId === agent.id;
         input.hovered = ui.hoverAgentId === agent.id;
-        input.speech = store.speechFor(agent.id);
+        const quiet = agent.roomId === 'quarters' || (fastForward && agent.status !== 'working');
+        input.speech = input.selected || input.hovered || !quiet ? store.speechFor(agent.id) : null;
         draw(ctx, camera, input, scratch.rect);
       }
     };

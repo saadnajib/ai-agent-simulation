@@ -34,7 +34,7 @@ HERMES applies the policy automatically after the grace period:
 |---|---|
 | Trailing ROI over 168 ticks | below -0.5 |
 | Ticks since last sale | more than 240 |
-| Grace before either rule applies | 72 ticks from spawn |
+| Grace before either rule applies | 336 ticks from spawn (two sim weeks); ROI is only judged once something is published |
 
 You apply these by hand, at the weekly review, in real calendar time:
 
@@ -73,7 +73,7 @@ One tick is one simulated hour. The wall clock fires a tick every `1000 / (TICK_
 
 Recommended: `TICK_HZ=0.00278` and `DAILY_TOKEN_BUDGET_CENTS=200`. That gives ten HERMES epochs a day (about $2 of Opus at the estimate), a sales poll every six hours, and a per-reset budget small enough that a runaway loop costs $2, not $20. Leave the speed control at 1x in live mode; 64x turns a 6-minute tick into 6 seconds and multiplies everything above by 64.
 
-Kill and grace thresholds are in ticks, so at 6-minute ticks the 72-tick grace is 7.2 real hours and the 240-tick no-sale rule is one real day. That is far too fast for real marketplaces. The policy is persisted in the SQLite `meta` table under the key `policy` and merged over `DEFAULT_POLICY` on boot; there is no env variable or command to change it yet, so raising `graceTicks` and `killNoSaleTicks` means editing that row before starting. In live mode `overseer.instruct` ("do not kill anything younger than 30 days") lets the Claude layer replace a deterministic kill with an `active` status for a named venture, one epoch at a time. Otherwise accept that HERMES will kill and respawn quickly and treat live ventures as short experiments. The affiliate blog cannot survive default thresholds at any clock setting; instruct HERMES explicitly.
+Kill and grace thresholds are in ticks, so at 6-minute ticks the 336-tick grace is 1.4 real days and the 504-tick no-sale rule is 2.1 real days. That is still far too fast for real marketplaces, where a new Etsy listing needs 30 to 90 days to be judged. Before going live set `POLICY_OVERRIDES` in `.env`, for example `POLICY_OVERRIDES={"graceTicks":720,"killNoSaleTicks":1440}` (30 and 60 real days at 6-minute ticks). The merged policy is persisted in the SQLite `meta` table under the key `policy`; env overrides win over the stored row on boot. In live mode `overseer.instruct` ("do not kill anything younger than 30 days") lets the Claude layer replace a deterministic kill with an `active` status for a named venture, one epoch at a time. Otherwise accept that HERMES will kill and respawn quickly and treat live ventures as short experiments. The affiliate blog cannot survive default thresholds at any clock setting; instruct HERMES explicitly.
 
 ### 4.3 Then
 

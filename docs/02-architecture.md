@@ -126,7 +126,9 @@ Key invariants, all enforced in code:
   ─────────────>│  deterministic, pure, tested                │
                 │  1 score ventures by trailing ROI (softmax) │
                 │  2 shares = floor + (1 - n*floor) * softmax │
-                │  3 kill: roi < -0.5 or no sale > 240 ticks  │
+                │  3 kill: published and roi < -0.5, or no    │
+                │    sale > 504 ticks; unpublished after 2x    │
+                │    grace is killed as stalled                │
                 │  4 scale: roi >= 0.5 ; demote below         │
                 │  5 spawn if alive < maxVentures (best kind) │
                 │  6 one broadcast                            │
@@ -154,7 +156,7 @@ Key invariants, all enforced in code:
 
 If the Claude call fails, the deterministic plan applies unchanged and the log says so. HERMES cannot publish, spend, create accounts or contact anyone; the only outputs it has are the seven `OverseerAction` variants, and none of them leave the station.
 
-Default policy (`DEFAULT_POLICY`): epoch 24 ticks, window 168, exploration floor 0.05, grace 72, kill ROI -0.5, kill no-sale 240 ticks, scale ROI 0.5, max 8 ventures, max 3 crew per venture.
+Default policy (`DEFAULT_POLICY`): epoch 24 ticks, window 168, exploration floor 0.05, grace 336 ticks (two sim weeks), kill ROI -0.5, kill no-sale 504 ticks (three sim weeks), scale ROI 0.5, max 8 ventures, max 3 ventures per kind, max 3 crew per venture. Any field can be overridden with the `POLICY_OVERRIDES` env variable (JSON object).
 
 ## 7. The Airlock
 

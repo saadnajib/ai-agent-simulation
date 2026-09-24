@@ -49,3 +49,20 @@ describe('workspace confinement', () => {
     expect(() => createWorkspace(dir.path, 'Has Spaces')).toThrow(WorkspaceError);
   });
 });
+
+describe('resolveConfined with a root that does not exist yet', () => {
+  it('accepts nested paths instead of reporting a false link escape', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { resolveConfined } = await import('./workspace.js');
+    const base = mkdtempSync(join(tmpdir(), 'eternity-ws-'));
+    try {
+      const root = join(base, 'missing-venture');
+      expect(resolveConfined(root, 'research/niche.json')).toBe(join(root, 'research', 'niche.json'));
+      expect(() => resolveConfined(root, '../escape.json')).toThrow();
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
