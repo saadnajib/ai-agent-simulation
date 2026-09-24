@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#07090f" />
+    <title>Eternity Station</title>
+    <meta
+      name="description"
+      content="A space station where HERMES, the Overseer, allocates capital to crews of AI agents running micro-businesses. Watch the crew, approve what leaves the Airlock, and read the honest ETA to one trillion dollars."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app" aria-label="Eternity Station">
+      <canvas id="stage" aria-label="Station map"></canvas>
+      <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+      <div id="toast-host" aria-live="polite"></div>
+      <aside id="dock" class="dock" aria-label="Station dock"></aside>
+      <footer id="bottombar" class="bottombar"></footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

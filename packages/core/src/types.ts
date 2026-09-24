@@ -170,6 +170,11 @@ export interface Listing {
   quality: number;
   /** Niche key used by the market simulator for saturation. */
   niche: string;
+  /**
+   * Venture kind, so the market simulator can pick unit economics without a
+   * venture lookup. Optional; when absent the kind is inferred from platform.
+   */
+  kind?: VentureKind;
   status: ListingStatus;
   createdAtTick: number;
   publishedAtTick?: number;
