@@ -12,15 +12,18 @@ Every epoch HERMES reads trailing ROI per venture, cuts budget to losers, kills 
 
 ## Quickstart
 
+Run each line on its own (Windows PowerShell 5.1 does not accept `&&`):
+
 ```
 pnpm install
-pnpm sim      # MODE=sim: no credentials, no network, scripted brains, simulated demand
-pnpm dev      # server + Vite client
+pnpm dev
 ```
 
-Open http://localhost:5173. Press `3` for 16x. Sales appear within a simulated week.
+`pnpm dev` starts the server and the game together. Open http://localhost:5173. Press `3` for 16x. Sales appear within a simulated week.
 
-Requires Node 22.13+ and pnpm 10. `pnpm sim -- --reset` wipes the local SQLite database and workspaces.
+With no `.env` file the server runs in sim mode: no credentials, no network, scripted brains, simulated demand. `pnpm sim` starts only the server, for headless runs; do not run it at the same time as `pnpm dev`.
+
+Requires Node 22.13+ and pnpm 10. `pnpm sim --reset` wipes the local SQLite database and workspaces.
 
 ## Two modes
 

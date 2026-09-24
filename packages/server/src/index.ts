@@ -4,7 +4,8 @@
  */
 import './warnings.js';
 import { existsSync, rmSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { parse, resolve } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import { createAdapterRegistry } from '@eternity/adapters';
 import { createApi } from './api.js';
@@ -21,7 +22,8 @@ import { Station } from './station.js';
 function resetData(config: ServerConfig): void {
   const guard = (path: string) => {
     const abs = resolve(path);
-    if (abs === '/' || abs === resolve(process.env['HOME'] ?? '/root')) throw new ConfigError(`Refusing to delete ${abs}`);
+    // Drive roots (C:\ or /) and the home folder are never valid data paths, on any OS.
+    if (abs === parse(abs).root || abs === resolve(homedir())) throw new ConfigError(`Refusing to delete ${abs}`);
     return abs;
   };
   for (const suffix of ['', '-wal', '-shm', '-journal']) {

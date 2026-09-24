@@ -15,7 +15,7 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "start": "pnpm --filter @eternity/server start",
-    "sim": "MODE=sim pnpm --filter @eternity/server start"
+    "sim": "pnpm --filter @eternity/server start"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

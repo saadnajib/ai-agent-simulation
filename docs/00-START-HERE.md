@@ -12,15 +12,18 @@ It is not a money printer. The combined yearly sales of every marketplace it can
 
 ## Run it: sim first
 
+Run each line on its own (Windows PowerShell 5.1 does not accept `&&`):
+
 ```
 pnpm install
-pnpm sim          # server, MODE=sim, no credentials, no network, scripted brains
-pnpm dev          # in a second terminal: server + Vite client
+pnpm dev          # server + game together; sim mode by default, no keys, no network
 ```
+
+`pnpm sim` starts only the server for headless runs. Do not run it alongside `pnpm dev`, both use port 8787.
 
 Open http://localhost:5173. Press `3` for 16x speed. Within a simulated week you will see the first floating `+$x.xx` over the Print Foundry. Sim demand is inflated by `SIM_DEMAND_MULTIPLIER` (default 25) so you see sales in minutes; the HUD says so.
 
-Useful flags: `pnpm sim -- --reset` wipes the SQLite file and workspaces; `--seed 7` changes the deterministic run; `AUTO_APPROVE=false` makes even the sim wait for you at the Airlock.
+Useful flags: `pnpm sim --reset` wipes the SQLite file and workspaces; `--seed 7` changes the deterministic run; `AUTO_APPROVE=false` makes even the sim wait for you at the Airlock.
 
 Let it run for a simulated month. Watch HERMES kill things. Read its rationale in the Core tab. If you disagree with a kill, type why into the HERMES instruction box and see what it does at the next epoch.
 
