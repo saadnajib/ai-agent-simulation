@@ -7,11 +7,13 @@ import { createMockTransport } from './mockState.js';
 import { createNetClient, defaultWsUrl, type Transport } from './net.js';
 import { beginBubblePass, drawAgentBody, drawAgentLabel, drawSpeechBubble, spriteRect, type AgentDrawInput, type SpriteRect } from './render/agents.js';
 import { Camera, TILE, attachCameraControls } from './render/camera.js';
-import { FxLayer, platformColour } from './render/fx.js';
-import { MapLayer, Starfield, drawRoomOverlays, type RoomOverlayState } from './render/map.js';
+import { FxLayer, SALE_GREEN, SALE_RED } from './render/fx.js';
+import { ConduitFlow, MapLayer, Starfield, drawRoomOverlays, type RoomOverlayState } from './render/map.js';
+import { MINIMAP_H, Minimap } from './render/minimap.js';
 import { StationStore, resolveAgentPosition } from './store.js';
 import { createBottomBar } from './ui/bottombar.js';
 import { createDock } from './ui/dock.js';
+import { createHud, fillGutter } from './ui/hud.js';
 import { esc } from './ui/dom.js';
 import { formatCents, formatSignedCents } from './ui/format.js';
 import './style.css';
@@ -60,6 +62,9 @@ function boot(): void {
   const mapLayer = new MapLayer(map);
   const starfield = new Starfield();
   const fx = new FxLayer(map, toastHost);
+  const conduits = new ConduitFlow(map);
+  const minimap = new Minimap(map);
+  const miniWorld = { x: 0, y: 0 };
   const scratch = makeScratch();
 
   const transport: Transport = mock
@@ -72,6 +77,10 @@ function boot(): void {
   if (mock) store.setConnection('mock');
 
   const dock = createDock(dockRoot, app, store, transport);
+  const hudRoot = document.querySelector<HTMLElement>('#hud');
+  const hud = hudRoot === null ? null : createHud(hudRoot, store);
+  const gutter = document.querySelector<HTMLElement>('#gutter');
+  if (gutter !== null) fillGutter(gutter);
   const bottomBar = createBottomBar(barRoot, store, transport, {
     onToggleDock: () => dock.toggle(),
     onToggleFollow: () => store.setFollow(!store.state.ui.followSelected),
@@ -82,7 +91,7 @@ function boot(): void {
     const venture = store.ventureById(e.ventureId);
     const roomId = venture?.roomId ?? 'reactor';
     const centre = fx.roomCentre(roomId);
-    fx.spawnFloater(centre.x, centre.y, formatSignedCents(e.netCents), platformColour(e.platform), performance.now());
+    fx.spawnFloater(centre.x, centre.y, formatSignedCents(e.netCents), e.netCents >= 0 ? SALE_GREEN : SALE_RED, performance.now());
   });
   store.on('milestone.reached', (e) => {
     fx.showToast(`MILESTONE ${e.label}`, `Lifetime revenue passed ${formatCents(e.cents)} at tick ${e.tick}`);
@@ -100,6 +109,11 @@ function boot(): void {
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
     camera.setViewport(rect.width, rect.height);
     camera.fit();
+    // Lift the station into the space above the minimap when there is vertical slack.
+    const mapH = map.height * TILE * camera.zoom;
+    const reserve = MINIMAP_H + 20;
+    if (rect.height - mapH >= reserve + 16) camera.y = Math.round((rect.height - reserve - mapH) / 2 + 6);
+    minimap.layout(rect.width, rect.height);
   };
   window.addEventListener('resize', resize);
   resize();
@@ -159,6 +173,12 @@ function boot(): void {
 
   attachCameraControls(canvas, camera, {
     onClick(sx, sy) {
+      if (minimap.hit(sx, sy)) {
+        minimap.toWorld(sx, sy, miniWorld);
+        camera.centreOn(miniWorld.x, miniWorld.y);
+        if (store.state.ui.followSelected) store.setFollow(false);
+        return;
+      }
       const agent = agentAt(sx, sy, performance.now());
       if (agent !== null) {
         store.selectAgent(store.state.ui.selectedAgentId === agent.id ? null : agent.id);
@@ -174,6 +194,11 @@ function boot(): void {
       }
     },
     onHover(sx, sy) {
+      if (minimap.hit(sx, sy)) {
+        tooltip.hidden = true;
+        store.setHover(null, null);
+        return;
+      }
       const agent = agentAt(sx, sy, performance.now());
       const roomId = agent === null ? roomAtScreen(sx, sy) : null;
       store.setHover(roomId, agent?.id ?? null);
@@ -250,6 +275,18 @@ function boot(): void {
     camera.follow((scratch.pos.x + 0.5) * TILE, (scratch.pos.y + 0.5) * TILE);
   };
 
+  const drawMinimap = (nowMs: number): void => {
+    minimap.begin(ctx, camera);
+    const station = store.station;
+    if (station !== null) {
+      for (const agent of station.agents) {
+        resolveAgentPosition(agent, store.state.motions.get(agent.id), nowMs, scratch.pos);
+        minimap.dot(ctx, scratch.pos.x, scratch.pos.y);
+      }
+    }
+    minimap.end(ctx);
+  };
+
   let barRevision = -1;
   const frame = (nowMs: number): void => {
     followSelected(nowMs);
@@ -258,11 +295,15 @@ function boot(): void {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     starfield.draw(ctx, w, h, camera.x, camera.y, nowMs);
 
-    const layer = mapLayer.ensure(camera.tilePx() * dpr);
+    const layer = mapLayer.ensure(camera.tilePx() * dpr, nowMs);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(layer, camera.x, camera.y, (map.width * mapLayer.scale) / dpr, (map.height * mapLayer.scale) / dpr);
+    // Draw at the live zoom; mid-zoom the cached layer is simply stretched until it re-renders.
+    const settled = mapLayer.scale === Math.max(4, Math.round(camera.tilePx() * dpr * 4) / 4);
+    const layerScale = settled ? mapLayer.scale / dpr : camera.tilePx();
+    ctx.drawImage(layer, camera.x, camera.y, map.width * layerScale, map.height * layerScale);
 
     updateRoomStates();
+    conduits.draw(ctx, camera, nowMs);
     drawRoomOverlays(ctx, map, camera, scratch.roomStates, nowMs);
     const treasury = store.station?.treasury;
     fx.drawAmbient(ctx, camera, {
@@ -274,11 +315,13 @@ function boot(): void {
     });
     drawAgents(nowMs);
     fx.drawOverlay(ctx, camera, nowMs);
+    drawMinimap(nowMs);
 
     dock.update(nowMs);
     if (store.state.revision !== barRevision) {
       barRevision = store.state.revision;
       bottomBar.update(store.state);
+      hud?.update(store.state);
     }
     requestAnimationFrame(frame);
   };

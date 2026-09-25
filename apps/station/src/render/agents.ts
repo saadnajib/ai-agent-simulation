@@ -34,7 +34,7 @@ const VISOR_GLINT = '#9be7ff';
 const BOOT = '#1a1d26';
 
 const STATUS_GLYPH: Partial<Record<AgentStatus, { text: string; colour: string }>> = {
-  working: { text: '⚙', colour: '#5cff9d' },
+  working: { text: '⚙', colour: '#39ff8a' },
   blocked: { text: '!', colour: '#ffb02e' },
   resting: { text: 'z', colour: '#b48cff' },
   offline: { text: '×', colour: '#5b6680' },
@@ -155,6 +155,39 @@ function drawOverseerSprite(ctx: CanvasRenderingContext2D, ox: number, oy: numbe
   px(ctx, ox, oy, u, 5, 0 + y0, 2, 1);
 }
 
+const glowCache = new Map<string, HTMLCanvasElement>();
+const GLOW_PX = 48;
+
+/** Soft radial glow in a role colour, rendered once and reused as a sprite. */
+function glowSprite(colour: string): HTMLCanvasElement | null {
+  const cached = glowCache.get(colour);
+  if (cached !== undefined) return cached;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = GLOW_PX;
+  c.height = GLOW_PX;
+  const g = c.getContext('2d');
+  if (g === null) return null;
+  const half = GLOW_PX / 2;
+  const grad = g.createRadialGradient(half, half, 0, half, half, half);
+  grad.addColorStop(0, colour);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.globalAlpha = 0.55;
+  g.fillStyle = grad;
+  g.fillRect(0, 0, GLOW_PX, GLOW_PX);
+  glowCache.set(colour, c);
+  return c;
+}
+
+/** Crew silhouette grown by one sprite pixel, drawn behind the body as a lit outline. */
+function drawWorkingOutline(ctx: CanvasRenderingContext2D, ox: number, oy: number, u: number, colour: string): void {
+  ctx.fillStyle = colour;
+  px(ctx, ox, oy, u, 2, -1, 8, 1);
+  px(ctx, ox, oy, u, 1, 0, 10, 6);
+  px(ctx, ox, oy, u, 0, 5, 12, 8);
+  px(ctx, ox, oy, u, 1, 13, 10, 4);
+}
+
 /** Draw one agent body. Labels and bubbles are drawn in a second pass so they sit above other bodies. */
 export function drawAgentBody(ctx: CanvasRenderingContext2D, cam: Camera, input: AgentDrawInput, rect: SpriteRect): void {
   const u = cam.zoom;
@@ -164,11 +197,20 @@ export function drawAgentBody(ctx: CanvasRenderingContext2D, cam: Camera, input:
 
   if (input.selected || input.hovered) {
     ctx.save();
-    ctx.strokeStyle = input.selected ? 'rgba(79,209,255,0.95)' : 'rgba(219,228,243,0.55)';
+    ctx.strokeStyle = input.selected ? 'rgba(57,255,138,0.95)' : 'rgba(180,255,210,0.55)';
     ctx.lineWidth = input.selected ? 2 : 1;
     ctx.strokeRect(ox - 2.5, oy - 2.5, rect.w + 5, rect.h + 5);
     ctx.restore();
   }
+
+  const pal = ROLE_PALETTE[input.agent.role];
+  const working = input.agent.status === 'working';
+  const glow = glowSprite(pal.trim);
+  if (glow !== null) {
+    const size = rect.h * (working ? 2 : 1.6);
+    ctx.drawImage(glow, ox + rect.w / 2 - size / 2, oy + rect.h / 2 - size / 2, size, size);
+  }
+  if (working && input.agent.role !== 'overseer') drawWorkingOutline(ctx, ox, oy, u, pal.trim);
 
   if (input.agent.role === 'overseer') drawOverseerSprite(ctx, ox, oy, u, input);
   else drawCrewSprite(ctx, ox, oy, u, input);
@@ -201,9 +243,9 @@ export function drawAgentLabel(ctx: CanvasRenderingContext2D, cam: Camera, input
   ctx.textBaseline = 'top';
   const name = input.agent.name;
   const w = ctx.measureText(name).width + 6;
-  ctx.fillStyle = 'rgba(5,7,12,0.75)';
+  ctx.fillStyle = 'rgba(1,6,3,0.8)';
   ctx.fillRect(Math.round(cx - w / 2), Math.round(top), Math.round(w), 13);
-  ctx.fillStyle = input.selected ? '#4fd1ff' : ROLE_PALETTE[input.agent.role].trim;
+  ctx.fillStyle = input.selected ? '#39ff8a' : ROLE_PALETTE[input.agent.role].trim;
   ctx.fillText(name, Math.round(cx), Math.round(top) + 2);
 }
 
@@ -261,17 +303,21 @@ export function drawSpeechBubble(ctx: CanvasRenderingContext2D, cam: Camera, inp
   const x = Math.round(cx - w / 2);
   const anchorY = Math.round(rect.y - h - 10);
   const y = settleBubble(x, anchorY, w, h);
-  ctx.fillStyle = 'rgba(236,241,250,0.96)';
+  ctx.fillStyle = 'rgba(2,14,7,0.94)';
+  ctx.strokeStyle = 'rgba(57,255,138,0.75)';
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.roundRect(x, y, w, h, 5);
+  ctx.roundRect(x + 0.5, y + 0.5, w, h, 3);
   ctx.fill();
+  ctx.stroke();
   // Short tail stub; a bubble pushed up by a neighbour stacks above it rather than drawing through it.
   ctx.beginPath();
   ctx.moveTo(cx - 4, y + h);
   ctx.lineTo(cx + 4, y + h);
   ctx.lineTo(cx, y + h + 5);
   ctx.closePath();
+  ctx.fillStyle = 'rgba(57,255,138,0.75)';
   ctx.fill();
-  ctx.fillStyle = '#0e1220';
+  ctx.fillStyle = '#b8ffd2';
   ctx.fillText(text, x + padX, y + h / 2 + 0.5);
 }

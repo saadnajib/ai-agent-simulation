@@ -20,7 +20,7 @@ export const PLATFORM_COLOURS: Record<string, string> = {
   distrokid: '#c9b0ff',
   pinterest: '#e60023',
   x: '#e3e9f5',
-  mock: '#4fd1ff',
+  mock: '#39ff8a',
 };
 
 export function platformColour(platform: string): string {
@@ -41,6 +41,12 @@ const FLOATER_POOL = 96;
 const FLOATER_TTL_MS = 1700;
 const FLOATER_RISE_TILES = 1.4;
 const TOAST_MS = 4000;
+const FLASH_P = 0.18;
+const RING_DASH: number[] = [3, 5];
+const NO_DASH: number[] = [];
+/** Sale pop-up colours: phosphor green for income, red for refunds and losses. */
+export const SALE_GREEN = '#39ff8a';
+export const SALE_RED = '#ff4d5e';
 
 export interface FxFrameInput {
   nowMs: number;
@@ -144,17 +150,52 @@ export class FxLayer {
     const pulse = 1 + 0.06 * Math.sin(input.nowMs / 420);
     const dilation = Math.min(1, input.workingAgents / 12);
     const irisR = t * (0.55 + 0.4 * dilation) * pulse;
-    const ambient = ctx.createRadialGradient(cx, cy, irisR * 0.5, cx, cy, t * 3.2);
-    ambient.addColorStop(0, `rgba(255,50,60,${(0.28 * pulse).toFixed(3)})`);
+
+    // Large green-white halo that breathes with the number of working crew.
+    const breath = 0.5 + 0.5 * Math.sin(input.nowMs / (1400 - 600 * dilation));
+    const haloR = t * (5.5 + 2.5 * dilation + 0.6 * breath);
+    const haloA = 0.2 + 0.22 * dilation + 0.08 * breath;
+    const halo = ctx.createRadialGradient(cx, cy, t * 0.6, cx, cy, haloR);
+    halo.addColorStop(0, `rgba(215,255,230,${haloA.toFixed(3)})`);
+    halo.addColorStop(0.35, `rgba(80,255,150,${(haloA * 0.55).toFixed(3)})`);
+    halo.addColorStop(1, 'rgba(57,255,138,0)');
+    ctx.fillStyle = halo;
+    ctx.fillRect(cx - haloR, cy - haloR, haloR * 2, haloR * 2);
+
+    // Concentric instrument rings, one dashed and slowly turning.
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = `rgba(190,255,215,${(0.45 + 0.2 * breath).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, t * 1.45, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(120,255,170,0.3)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, t * 2.35, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash(RING_DASH);
+    ctx.lineDashOffset = -input.nowMs / 60;
+    ctx.strokeStyle = 'rgba(120,255,170,0.55)';
+    ctx.lineWidth = Math.max(1, t * 0.08);
+    ctx.beginPath();
+    ctx.arc(cx, cy, t * 1.9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash(NO_DASH);
+    ctx.lineDashOffset = 0;
+    ctx.lineWidth = 1;
+
+    const ambient = ctx.createRadialGradient(cx, cy, irisR * 0.5, cx, cy, t * 1.8);
+    ambient.addColorStop(0, `rgba(255,50,60,${(0.35 * pulse).toFixed(3)})`);
     ambient.addColorStop(1, 'rgba(255,50,60,0)');
     ctx.fillStyle = ambient;
-    ctx.fillRect(cx - t * 3.2, cy - t * 3.2, t * 6.4, t * 6.4);
+    ctx.fillRect(cx - t * 1.8, cy - t * 1.8, t * 3.6, t * 3.6);
 
     // Sclera, iris, pupil.
     ctx.fillStyle = '#1a0507';
     ctx.beginPath();
     ctx.ellipse(cx, cy, t * 1.0, t * 0.7, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = 'rgba(200,255,220,0.6)';
+    ctx.stroke();
     const iris = ctx.createRadialGradient(cx - irisR * 0.2, cy - irisR * 0.2, irisR * 0.1, cx, cy, irisR);
     iris.addColorStop(0, '#ff9aa2');
     iris.addColorStop(0.45, '#ff2d3f');
@@ -181,28 +222,37 @@ export class FxLayer {
     const profit = input.dailyProfitCents;
     const magnitude = profit === 0 ? 0 : Math.min(1, Math.log10(1 + Math.abs(profit) / 100) / 4);
     const positive = profit > 0;
-    const base = positive ? '79,209,255' : profit < 0 ? '255,77,94' : '120,140,160';
+    // Blue-white when profitable; a smaller, dimmer, red-cored glow when losing money.
+    const base = positive ? '185,220,255' : profit < 0 ? '255,120,130' : '140,160,190';
     const freq = 900 - 500 * magnitude;
     const pulse = 0.75 + 0.25 * Math.sin(input.nowMs / freq);
-    const alpha = (0.12 + 0.5 * magnitude) * pulse;
-    const radius = t * (1.6 + 2.6 * magnitude);
-    const glow = ctx.createRadialGradient(cx, cy, t * 0.4, cx, cy, radius);
-    glow.addColorStop(0, `rgba(${base},${alpha.toFixed(3)})`);
+    const scale = positive ? 1 : 0.45;
+    const alpha = (0.18 + 0.5 * magnitude * scale) * pulse;
+    const radius = t * (2 + 3.2 * magnitude * scale);
+    const glow = ctx.createRadialGradient(cx, cy, t * 0.3, cx, cy, radius);
+    glow.addColorStop(0, `rgba(240,248,255,${Math.min(1, alpha * 1.3).toFixed(3)})`);
+    glow.addColorStop(0.3, `rgba(${base},${alpha.toFixed(3)})`);
     glow.addColorStop(1, `rgba(${base},0)`);
     ctx.fillStyle = glow;
     ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    ctx.strokeStyle = `rgba(${base},${(0.35 + 0.25 * pulse).toFixed(3)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, t * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, t * 2.3, 0, Math.PI * 2);
+    ctx.stroke();
     // Four rods in a 2x2 block around the centre.
     const rod = t * 0.7;
     const gap = t * 0.15;
     ctx.fillStyle = `rgba(${base},${(0.55 + 0.45 * pulse).toFixed(3)})`;
-    for (const dx of [-1, 0]) {
-      for (const dy of [-1, 0]) {
-        const x = cx + (dx === -1 ? -rod - gap / 2 : gap / 2);
-        const y = cy + (dy === -1 ? -rod - gap / 2 : gap / 2);
-        ctx.fillRect(Math.round(x), Math.round(y), Math.round(rod), Math.round(rod));
-      }
+    for (let i = 0; i < 4; i++) {
+      const x = cx + (i % 2 === 0 ? -rod - gap / 2 : gap / 2);
+      const y = cy + (i < 2 ? -rod - gap / 2 : gap / 2);
+      ctx.fillRect(Math.round(x), Math.round(y), Math.round(rod), Math.round(rod));
     }
-    ctx.fillStyle = `rgba(255,255,255,${(0.35 * pulse).toFixed(3)})`;
+    ctx.fillStyle = `rgba(255,255,255,${(0.5 * pulse).toFixed(3)})`;
     ctx.fillRect(Math.round(cx - t * 0.15), Math.round(cy - t * 0.15), Math.round(t * 0.3), Math.round(t * 0.3));
   }
 
@@ -212,14 +262,24 @@ export class FxLayer {
     const y = cam.y + this.airlockLamp.y * t;
     const pending = input.pendingApprovals > 0;
     const on = pending ? Math.sin(input.nowMs / 300) > 0 : true;
-    const colour = pending ? '255,176,46' : '92,255,157';
+    const colour = pending ? '255,176,46' : '57,255,138';
     const r = Math.max(2, t * 0.22);
     if (pending) {
+      // Module burns brighter while approvals wait: stacked rims fake a halo without shadowBlur.
       const room = this.map.rooms.airlock;
       const rx = cam.x + room.x * t;
       const ry = cam.y + room.y * t;
-      ctx.fillStyle = `rgba(255,176,46,${(on ? 0.07 : 0.03).toFixed(3)})`;
-      ctx.fillRect(rx, ry, room.w * t, room.h * t);
+      const rw = room.w * t;
+      const rh = room.h * t;
+      const beat = 0.6 + 0.4 * Math.sin(input.nowMs / 420);
+      ctx.fillStyle = `rgba(255,176,46,${(0.05 + 0.05 * beat).toFixed(3)})`;
+      ctx.fillRect(rx + t, ry + t, rw - 2 * t, rh - 2 * t);
+      ctx.lineWidth = 2;
+      for (let i = 1; i <= 3; i++) {
+        const g = i * 3;
+        ctx.strokeStyle = `rgba(255,176,46,${((0.5 * beat) / i).toFixed(3)})`;
+        ctx.strokeRect(rx - g, ry - g, rw + g * 2, rh + g * 2);
+      }
     }
     if (on) {
       const glow = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 6);
@@ -232,18 +292,16 @@ export class FxLayer {
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(10,12,18,0.9)';
+    ctx.strokeStyle = 'rgba(2,8,4,0.9)';
     ctx.lineWidth = 1;
     ctx.stroke();
   }
 
   private drawFloaters(ctx: CanvasRenderingContext2D, cam: Camera, nowMs: number): void {
     const t = cam.tilePx();
-    ctx.font = `700 ${Math.max(11, Math.round(8 * cam.zoom))}px ui-monospace, Menlo, monospace`;
+    ctx.font = `700 ${Math.max(12, Math.round(8.5 * cam.zoom))}px ui-monospace, Menlo, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(5,7,12,0.9)';
     for (const f of this.floaters) {
       if (!f.active) continue;
       const p = (nowMs - f.bornMs) / f.ttlMs;
@@ -255,9 +313,21 @@ export class FxLayer {
       const x = cam.x + f.tileX * t;
       const y = cam.y + (f.tileY - ease * FLOATER_RISE_TILES) * t;
       const alpha = p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4;
+      // Brief flash: an expanding ring at the spawn point and a white-hot first few frames.
+      if (p < FLASH_P) {
+        const k = p / FLASH_P;
+        ctx.globalAlpha = 1 - k;
+        ctx.strokeStyle = f.colour;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, cam.y + f.tileY * t, t * (0.3 + 1.2 * k), 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.globalAlpha = alpha;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(1,6,3,0.92)';
       ctx.strokeText(f.text, x, y);
-      ctx.fillStyle = f.colour;
+      ctx.fillStyle = p < FLASH_P * 0.6 ? '#eafff2' : f.colour;
       ctx.fillText(f.text, x, y);
     }
     ctx.globalAlpha = 1;

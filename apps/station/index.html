@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#07090f" />
+    <meta name="theme-color" content="#010402" />
     <title>Eternity Station</title>
     <meta
       name="description"
@@ -17,11 +17,15 @@
   </head>
   <body>
     <div id="app" aria-label="Eternity Station">
+      <header id="hud" class="hud" aria-label="Station readouts"></header>
+      <div id="gutter" class="gutter" aria-hidden="true"></div>
       <canvas id="stage" aria-label="Station map"></canvas>
+      <div class="crt" aria-hidden="true"></div>
       <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
       <div id="toast-host" aria-live="polite"></div>
       <aside id="dock" class="dock" aria-label="Station dock"></aside>
       <footer id="bottombar" class="bottombar"></footer>
+      <div class="bezel" aria-hidden="true"><i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br br-r"></i></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
